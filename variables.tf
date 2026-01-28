@@ -39,3 +39,19 @@ variable "db_password" {
   type      = string
   sensitive = true
 }
+
+variable "bak_file_path" {
+  description = "Local path to the MSSQL .bak file to upload to S3"
+  type        = string
+}
+
+variable "bak_object_key" {
+  description = "S3 object key (path) for the .bak"
+  type        = string
+  default     = "backups/db_n_cloudSecurity_assignment_1.bak"
+}
+
+variable "s3_bucket_name" {
+  description = "S3 bucket name for backups (must be globally unique)"
+  type        = string
+}

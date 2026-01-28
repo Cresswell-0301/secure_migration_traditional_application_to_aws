@@ -271,9 +271,9 @@ resource "aws_db_instance" "mssql" {
   db_subnet_group_name   = aws_db_subnet_group.db_subnets.name
   vpc_security_group_ids = [aws_security_group.rds_sg.id]
 
-  publicly_accessible     = false
-  multi_az                = false
-  backup_retention_period = 0
+  publicly_accessible      = false
+  multi_az                 = false
+  backup_retention_period  = 0
   delete_automated_backups = true
 
   username = var.db_username
@@ -284,3 +284,106 @@ resource "aws_db_instance" "mssql" {
   tags = { Name = "ccs6344-mssql-rds" }
 }
 
+resource "aws_s3_bucket" "backup" {
+  bucket = var.s3_bucket_name
+
+  tags = {
+    Name = "ccs6344-backup-bucket"
+  }
+}
+
+resource "aws_s3_bucket_public_access_block" "backup" {
+  bucket = aws_s3_bucket.backup.id
+
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "backup" {
+  bucket = aws_s3_bucket.backup.id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "AES256"
+    }
+  }
+}
+
+resource "aws_s3_object" "mssql_bak" {
+  bucket = aws_s3_bucket.backup.id
+  key    = var.bak_object_key
+  source = var.bak_file_path
+
+  # Ensures Terraform detects local file changes
+  etag = filemd5(var.bak_file_path)
+
+  content_type = "application/octet-stream"
+
+  tags = {
+    Name = "ccs6344-mssql-bak"
+  }
+
+  depends_on = [
+    aws_s3_bucket_server_side_encryption_configuration.backup,
+    aws_s3_bucket_public_access_block.backup
+  ]
+}
+
+resource "aws_subnet" "public_2" {
+  vpc_id                  = aws_vpc.main.id
+  cidr_block              = "10.10.4.0/24"
+  availability_zone       = "ap-southeast-5b"
+  map_public_ip_on_launch = true
+
+  ipv6_cidr_block                 = cidrsubnet(aws_vpc.main.ipv6_cidr_block, 8, 3)
+  assign_ipv6_address_on_creation = true
+
+  tags = { Name = "ccs6344-public-subnet-2" }
+}
+
+resource "aws_route_table_association" "public_assoc_2" {
+  subnet_id      = aws_subnet.public_2.id
+  route_table_id = aws_route_table.public_rt.id
+}
+
+resource "aws_security_group" "alb_sg" {
+  name        = "ccs6344-alb-sg"
+  description = "ALB public ingress"
+  vpc_id      = aws_vpc.main.id
+
+  ingress {
+    from_port        = 80
+    to_port          = 80
+    protocol         = "tcp"
+    cidr_blocks      = ["0.0.0.0/0"]
+    ipv6_cidr_blocks = ["::/0"]
+  }
+
+  ingress {
+    from_port        = 443
+    to_port          = 443
+    protocol         = "tcp"
+    cidr_blocks      = ["0.0.0.0/0"]
+    ipv6_cidr_blocks = ["::/0"]
+  }
+
+  egress {
+    from_port        = 0
+    to_port          = 0
+    protocol         = "-1"
+    cidr_blocks      = ["0.0.0.0/0"]
+    ipv6_cidr_blocks = ["::/0"]
+  }
+
+  tags = { Name = "ccs6344-alb-sg" }
+}
+
+resource "aws_vpc_security_group_ingress_rule" "app_http_from_alb" {
+  security_group_id            = aws_security_group.app_sg.id
+  referenced_security_group_id = aws_security_group.alb_sg.id
+  ip_protocol                  = "tcp"
+  from_port                    = 80
+  to_port                      = 80
+}

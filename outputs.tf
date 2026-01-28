@@ -37,3 +37,12 @@ output "rds_endpoint" {
 output "rds_engine" {
   value = aws_db_instance.mssql.engine
 }
+
+output "backup_bucket_name" {
+  value = aws_s3_bucket.backup.bucket
+}
+
+output "bak_s3_uri" {
+  value = "s3://${aws_s3_bucket.backup.bucket}/${aws_s3_object.mssql_bak.key}"
+}
+
