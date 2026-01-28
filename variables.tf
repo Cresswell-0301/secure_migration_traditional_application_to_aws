@@ -1,6 +1,6 @@
 variable "region" {
   type    = string
-  default = "ap-southeast-1"
+  default = "ap-southeast-5"
 }
 
 variable "vpc_cidr" {
@@ -27,3 +27,15 @@ variable "key_name" {
   type = string
 }
 
+variable "db_name" {
+  type = string
+}
+
+variable "db_username" {
+  type = string
+}
+
+variable "db_password" {
+  type      = string
+  sensitive = true
+}

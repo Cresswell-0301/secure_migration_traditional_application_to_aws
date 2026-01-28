@@ -30,3 +30,10 @@ output "db_ipv6" {
   value = aws_instance.db.ipv6_addresses
 }
 
+output "rds_endpoint" {
+  value = aws_db_instance.mssql.endpoint
+}
+
+output "rds_engine" {
+  value = aws_db_instance.mssql.engine
+}

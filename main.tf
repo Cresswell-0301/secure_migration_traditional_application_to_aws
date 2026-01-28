@@ -203,3 +203,84 @@ resource "aws_instance" "app" {
 
   tags = { Name = "ccs6344-app" }
 }
+
+data "aws_availability_zones" "available" {
+  state = "available"
+}
+
+resource "aws_subnet" "private_2" {
+  vpc_id                  = aws_vpc.main.id
+  cidr_block              = "10.10.3.0/24"
+  availability_zone       = data.aws_availability_zones.available.names[1]
+  map_public_ip_on_launch = false
+
+  ipv6_cidr_block                 = cidrsubnet(aws_vpc.main.ipv6_cidr_block, 8, 2)
+  assign_ipv6_address_on_creation = true
+
+  tags = { Name = "ccs6344-private-subnet-2" }
+}
+
+resource "aws_route_table_association" "private_assoc_2" {
+  subnet_id      = aws_subnet.private_2.id
+  route_table_id = aws_route_table.private_rt.id
+}
+
+resource "aws_db_subnet_group" "db_subnets" {
+  name       = "ccs6344-db-subnets"
+  subnet_ids = [aws_subnet.private.id, aws_subnet.private_2.id]
+
+  tags = { Name = "ccs6344-db-subnets" }
+}
+
+resource "aws_security_group" "rds_sg" {
+  name        = "ccs6344-rds-sg"
+  description = "RDS MSSQL only from app SG"
+  vpc_id      = aws_vpc.main.id
+
+  egress {
+    from_port        = 0
+    to_port          = 0
+    protocol         = "-1"
+    cidr_blocks      = ["0.0.0.0/0"]
+    ipv6_cidr_blocks = ["::/0"]
+  }
+
+  tags = { Name = "ccs6344-rds-sg" }
+}
+
+resource "aws_vpc_security_group_ingress_rule" "rds_mssql_from_app" {
+  security_group_id            = aws_security_group.rds_sg.id
+  referenced_security_group_id = aws_security_group.app_sg.id
+  ip_protocol                  = "tcp"
+  from_port                    = 1433
+  to_port                      = 1433
+}
+
+resource "aws_db_instance" "mssql" {
+  identifier = "ccs6344-mssql-rds"
+
+  engine         = "sqlserver-ex"
+  engine_version = "15.00"
+  instance_class = "db.t3.micro"
+
+  allocated_storage     = 20
+  max_allocated_storage = 50
+  storage_type          = "gp2"
+  storage_encrypted     = true
+
+  db_subnet_group_name   = aws_db_subnet_group.db_subnets.name
+  vpc_security_group_ids = [aws_security_group.rds_sg.id]
+
+  publicly_accessible     = false
+  multi_az                = false
+  backup_retention_period = 0
+  delete_automated_backups = true
+
+  username = var.db_username
+  password = var.db_password
+
+  skip_final_snapshot = true
+
+  tags = { Name = "ccs6344-mssql-rds" }
+}
+
