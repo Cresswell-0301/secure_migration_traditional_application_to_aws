@@ -10,3 +10,9 @@ terraform.tfvars
 
 # Sensitive
 *.pem
+# secrets
+.env
+*.pem
+*.key
+*.tfstate
+terraform.tfstate.backup
