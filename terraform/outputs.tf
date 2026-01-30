@@ -1,19 +1,3 @@
-output "vpc_id" {
-  value = aws_vpc.main.id
-}
-
-output "vpc_ipv6_cidr" {
-  value = aws_vpc.main.ipv6_cidr_block
-}
-
-output "public_subnet_id" {
-  value = aws_subnet.public.id
-}
-
-output "private_subnet_id" {
-  value = aws_subnet.private.id
-}
-
 output "app_public_ip" {
   value = aws_instance.app.public_ip
 }
@@ -22,27 +6,38 @@ output "app_ipv6" {
   value = aws_instance.app.ipv6_addresses
 }
 
-output "db_public_ip" {
-  value = aws_instance.db.public_ip
-}
-
-output "db_ipv6" {
-  value = aws_instance.db.ipv6_addresses
-}
-
 output "rds_endpoint" {
   value = aws_db_instance.mssql.endpoint
 }
 
-output "rds_engine" {
-  value = aws_db_instance.mssql.engine
+output "rds_option_group" {
+  value = aws_db_option_group.mssql_backup_restore.name
+}
+
+output "rds_restore_role_arn" {
+  value = aws_iam_role.rds_backup_restore_role.arn
 }
 
 output "backup_bucket_name" {
   value = aws_s3_bucket.backup.bucket
 }
 
-output "bak_s3_uri" {
-  value = "s3://${aws_s3_bucket.backup.bucket}/${aws_s3_object.mssql_bak.key}"
+output "bak_s3_arn" {
+  value = "arn:aws:s3:::${aws_s3_bucket.backup.bucket}/${var.bak_object_key}"
 }
 
+output "ecr_repo_url" {
+  value = aws_ecr_repository.clinic_repo.repository_url
+}
+
+output "app_sg_id" {
+  value = var.app_sg_id
+}
+
+output "rds_sg_id" {
+  value = var.rds_sg_id
+}
+
+output "alb_sg_id" {
+  value = var.alb_sg_id
+}
