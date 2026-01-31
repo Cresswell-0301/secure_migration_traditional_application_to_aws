@@ -89,8 +89,7 @@ if (isset($_POST['login_submit']) && $_SERVER['REQUEST_METHOD'] === 'POST') {
             exit;
         }
 
-        $sql = "SELECT user_id, username, full_name, password_hash, role
-        FROM Users WHERE username = ? AND is_active = 1";
+        $sql = "SELECT user_id, username, full_name, email, phone_number, password_hash, role, is_active FROM Users WHERE username = ?";
 
         $stmt = sqlsrv_prepare($conn, $sql, [$username]);
 
@@ -115,6 +114,8 @@ if (isset($_POST['login_submit']) && $_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['user_id'] = $user['user_id'];
             $_SESSION['username'] = $user['username'];
             $_SESSION['full_name'] = $user['full_name'];
+            $_SESSION['email'] = $user['email'];
+            $_SESSION['phone_number'] = $user['phone_number'];
             $_SESSION['role'] = $user['role'];
         } else {
 
