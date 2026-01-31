@@ -226,3 +226,15 @@ resource "aws_route_table_association" "public_assoc_2" {
   subnet_id      = aws_subnet.public_2.id
   route_table_id = aws_route_table.public_rt.id
 }
+
+variable "alb_name" {
+  type        = string
+  description = "Existing ALB name (console-created)"
+  default     = "ccs6344-alb"
+}
+
+variable "waf_name" {
+  type        = string
+  description = "WAF Web ACL name"
+  default     = "ccs6344-clinic-alb-waf"
+}

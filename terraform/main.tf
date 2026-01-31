@@ -558,3 +558,56 @@ resource "aws_vpc_security_group_ingress_rule" "rds_mssql_from_app" {
   to_port                      = 1433
   ip_protocol                  = "tcp"
 }
+
+############################################
+# WAFv2 (REGIONAL) attached to existing ALB
+############################################
+
+# Read existing ALB created in console (by name)
+data "aws_lb" "clinic_alb" {
+  name = var.alb_name
+}
+
+resource "aws_wafv2_web_acl" "clinic_waf" {
+  name        = var.waf_name
+  description = "WAF for Clinic ALB (managed Core rule set)"
+  scope       = "REGIONAL"
+
+  default_action {
+    allow {}
+  }
+
+  visibility_config {
+    cloudwatch_metrics_enabled = true
+    metric_name                = "clinicAlbWaf"
+    sampled_requests_enabled   = true
+  }
+
+  # Core rule set (AWSManagedRulesCommonRuleSet)
+  rule {
+    name     = "AWSManagedRulesCommonRuleSet"
+    priority = 1
+
+    override_action {
+      none {}
+    }
+
+    statement {
+      managed_rule_group_statement {
+        vendor_name = "AWS"
+        name        = "AWSManagedRulesCommonRuleSet"
+      }
+    }
+
+    visibility_config {
+      cloudwatch_metrics_enabled = true
+      metric_name                = "CommonRuleSet"
+      sampled_requests_enabled   = true
+    }
+  }
+}
+
+resource "aws_wafv2_web_acl_association" "clinic_waf_assoc" {
+  resource_arn = data.aws_lb.clinic_alb.arn
+  web_acl_arn  = aws_wafv2_web_acl.clinic_waf.arn
+}

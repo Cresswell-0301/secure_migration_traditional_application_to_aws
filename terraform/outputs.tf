@@ -59,3 +59,11 @@ output "admin_readonly_user_secret_access_key" {
   value     = aws_iam_access_key.admin_readonly_user_key.secret
   sensitive = true
 }
+
+output "waf_web_acl_arn" {
+  value = aws_wafv2_web_acl.clinic_waf.arn
+}
+
+output "alb_arn" {
+  value = data.aws_lb.clinic_alb.arn
+}
