@@ -41,3 +41,21 @@ output "rds_sg_id" {
 output "alb_sg_id" {
   value = var.alb_sg_id
 }
+
+output "rds_limited_user_access_key_id" {
+  value = aws_iam_access_key.rds_limited_user_key.id
+}
+
+output "rds_limited_user_secret_access_key" {
+  value     = aws_iam_access_key.rds_limited_user_key.secret
+  sensitive = true
+}
+
+output "admin_readonly_user_access_key_id" {
+  value = aws_iam_access_key.admin_readonly_user_key.id
+}
+
+output "admin_readonly_user_secret_access_key" {
+  value     = aws_iam_access_key.admin_readonly_user_key.secret
+  sensitive = true
+}

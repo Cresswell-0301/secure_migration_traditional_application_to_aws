@@ -102,3 +102,127 @@ variable "db_username" {
   type        = string
   default     = "admin"
 }
+
+variable "rds_limited_user_name" {
+  type    = string
+  default = "rds-limited-user"
+}
+
+variable "admin_readonly_user_name" {
+  type    = string
+  default = "admin-readonly-user"
+}
+
+variable "backup_bucket_name" {
+  type = string
+}
+
+resource "aws_iam_user" "rds_limited_user" {
+  name = var.rds_limited_user_name
+}
+
+resource "aws_iam_user" "admin_readonly_user" {
+  name = var.admin_readonly_user_name
+}
+
+resource "aws_iam_user_policy_attachment" "admin_readonly_attach" {
+  user       = aws_iam_user.admin_readonly_user.name
+  policy_arn = "arn:aws:iam::aws:policy/ReadOnlyAccess"
+}
+
+data "aws_iam_policy_document" "rds_limited_s3" {
+  statement {
+    sid = "ListBucket"
+    actions = [
+      "s3:ListBucket"
+    ]
+    resources = [
+      "arn:aws:s3:::${var.backup_bucket_name}"
+    ]
+  }
+
+  statement {
+    sid = "ObjectRW"
+    actions = [
+      "s3:GetObject",
+      "s3:PutObject",
+      "s3:DeleteObject"
+    ]
+    resources = [
+      "arn:aws:s3:::${var.backup_bucket_name}/*"
+    ]
+  }
+}
+
+resource "aws_iam_user_policy" "rds_limited_s3_inline" {
+  name   = "rds-limited-s3-backup-bucket"
+  user   = aws_iam_user.rds_limited_user.name
+  policy = data.aws_iam_policy_document.rds_limited_s3.json
+}
+
+resource "aws_iam_access_key" "rds_limited_user_key" {
+  user = aws_iam_user.rds_limited_user.name
+}
+
+resource "aws_iam_access_key" "admin_readonly_user_key" {
+  user = aws_iam_user.admin_readonly_user.name
+}
+
+variable "key_name" {
+  description = "Existing EC2 key pair name"
+  type        = string
+}
+
+# App EC2
+variable "app_instance_type" {
+  description = "Instance type for the app EC2"
+  type        = string
+  default     = "t3.micro"
+}
+
+# Optional: if empty, main.tf will auto-pick latest Amazon Linux AMI
+variable "app_instance_ami_id" {
+  description = "Optional AMI id for app EC2. Leave empty to auto-select latest Amazon Linux 2023."
+  type        = string
+  default     = ""
+}
+
+# Windows DB EC2 (only used when enable_windows_db_ec2 = true)
+variable "windows_db_sg_id" {
+  description = "Security group id for Windows DB EC2"
+  type        = string
+}
+
+variable "windows_db_instance_type" {
+  description = "Instance type for Windows DB EC2"
+  type        = string
+  default     = "t3.large"
+}
+
+# Optional placeholder. Only required if enable_windows_db_ec2 = true.
+variable "windows_db_instance_ami_id" {
+  description = "AMI id for Windows DB EC2 (only needed when enable_windows_db_ec2 = true)"
+  type        = string
+  default     = ""
+}
+
+resource "aws_subnet" "public_2" {
+  vpc_id                  = aws_vpc.main.id
+  cidr_block              = "10.10.4.0/24"
+  availability_zone       = data.aws_availability_zones.available.names[1]
+  map_public_ip_on_launch = true
+
+  ipv6_cidr_block                 = cidrsubnet(aws_vpc.main.ipv6_cidr_block, 8, 3)
+  assign_ipv6_address_on_creation = true
+
+  tags = { Name = "ccs6344-public-subnet-2" }
+
+  lifecycle {
+    prevent_destroy = true
+  }
+}
+
+resource "aws_route_table_association" "public_assoc_2" {
+  subnet_id      = aws_subnet.public_2.id
+  route_table_id = aws_route_table.public_rt.id
+}

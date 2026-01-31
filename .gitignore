@@ -16,3 +16,5 @@ terraform.tfvars
 *.key
 *.tfstate
 terraform.tfstate.backup
+
+/app/includes/config.php

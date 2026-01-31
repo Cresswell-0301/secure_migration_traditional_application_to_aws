@@ -114,7 +114,7 @@ resource "aws_route_table_association" "private_assoc_2" {
 ############################################
 
 # EC2 app SG: 80/443 public, SSH restricted
-resource "aws_security_group" "ccs6344_app_sg" {
+resource "aws_security_group" "app_sg" {
   name        = "ccs6344-app-sg"
   description = "Allow HTTP/HTTPS; SSH only from my IP"
   vpc_id      = aws_vpc.main.id
@@ -164,7 +164,7 @@ resource "aws_security_group" "ccs6344_app_sg" {
     protocol        = "tcp"
     from_port       = 80
     to_port         = 80
-    security_groups = [aws_security_group.ccs6344_alb_sg.id]
+    security_groups = [aws_security_group.alb_sg.id]
   }
 
   # Allow all outbound IPv4 + IPv6
@@ -182,7 +182,7 @@ resource "aws_security_group" "ccs6344_app_sg" {
 }
 
 # RDS SG: only allow 1433 from app SG
-resource "aws_security_group" "ccs6344_rds_sg" {
+resource "aws_security_group" "rds_sg" {
   name        = "ccs6344-rds-sg"
   description = "RDS MSSQL only from app SG"
   vpc_id      = aws_vpc.main.id
@@ -192,7 +192,7 @@ resource "aws_security_group" "ccs6344_rds_sg" {
     protocol        = "tcp"
     from_port       = 1433
     to_port         = 1433
-    security_groups = [aws_security_group.ccs6344_app_sg.id]
+    security_groups = [aws_security_group.app_sg.id]
   }
 
   # MSSQL from ECS service SG
@@ -215,7 +215,7 @@ resource "aws_security_group" "ccs6344_rds_sg" {
   }
 }
 
-resource "aws_security_group" "ccs6344_alb_sg" {
+resource "aws_security_group" "alb_sg" {
   name        = "ccs6344-alb-sg"
   description = "ALB public ingress"
   vpc_id      = aws_vpc.main.id
@@ -261,7 +261,7 @@ resource "aws_security_group" "ccs6344_alb_sg" {
   }
 }
 
-resource "aws_security_group" "ccs6344_db_sg" {
+resource "aws_security_group" "db_sg" {
   name        = "ccs6344-db-sg"
   description = "DB only from app SG"
   vpc_id      = aws_vpc.main.id
@@ -270,7 +270,7 @@ resource "aws_security_group" "ccs6344_db_sg" {
     protocol        = "tcp"
     from_port       = 1433
     to_port         = 1433
-    security_groups = [aws_security_group.ccs6344_app_sg.id]
+    security_groups = [aws_security_group.app_sg.id]
   }
 
   ingress {
@@ -314,10 +314,10 @@ data "aws_ami" "amazon_linux" {
 }
 
 resource "aws_instance" "app" {
-  ami                         = var.app_instance_ami_id
+  ami                         = length(trimspace(var.app_instance_ami_id)) > 0 ? var.app_instance_ami_id : data.aws_ami.amazon_linux.id
   instance_type               = var.app_instance_type
   subnet_id                   = aws_subnet.public.id
-  vpc_security_group_ids      = [aws_security_group.ccs6344_app_sg.id]
+  vpc_security_group_ids      = [aws_security_group.app_sg.id]
   key_name                    = var.key_name
   associate_public_ip_address = true
   ipv6_address_count          = 1
@@ -327,6 +327,10 @@ resource "aws_instance" "app" {
   }
 
   iam_instance_profile = aws_iam_instance_profile.ec2_ecr_push_profile.name
+
+  lifecycle {
+    prevent_destroy = true
+  }
 
   tags = { Name = "ccs6344-app" }
 }
@@ -403,30 +407,30 @@ resource "aws_db_instance" "mssql" {
   identifier = "ccs6344-mssql-rds"
 
   engine         = "sqlserver-ex"
-  engine_version = "15.00.4455.2.v1"   # matches console
+  engine_version = "15.00.4455.2.v1" # matches console
 
-  instance_class = "db.t3.micro"       # matches console
+  instance_class = "db.t3.micro" # matches console
 
-  allocated_storage     = 20           # matches console
-  max_allocated_storage = 50           # matches console autoscaling limit
-  storage_type          = "gp2"        # matches console
-  storage_encrypted     = true         # matches console (KMS key shows aws/rds)
+  allocated_storage     = 20    # matches console
+  max_allocated_storage = 50    # matches console autoscaling limit
+  storage_type          = "gp2" # matches console
+  storage_encrypted     = true  # matches console (KMS key shows aws/rds)
 
   # keep default KMS key (aws/rds) by NOT setting kms_key_id
   # kms_key_id = null
 
-  username = "admin"                  # matches console (or var.db_username)
-  password = var.db_password          # keep sensitive in tfvars
+  username = "admin"         # matches console (or var.db_username)
+  password = var.db_password # keep sensitive in tfvars
 
   db_subnet_group_name   = aws_db_subnet_group.db_subnets.name
-  vpc_security_group_ids = [aws_security_group.ccs6344_rds_sg.id]
+  vpc_security_group_ids = [aws_security_group.rds_sg.id]
 
-  option_group_name = aws_db_option_group.mssql_backup_restore.name  # mssql-to-aws-s3
+  option_group_name = aws_db_option_group.mssql_backup_restore.name # mssql-to-aws-s3
 
-  publicly_accessible = false         # you used private subnets; keep this
-  multi_az            = false         # SQL Server Express / console shows N/A
+  publicly_accessible = false # you used private subnets; keep this
+  multi_az            = false # SQL Server Express / console shows N/A
 
-  deletion_protection = false         # matches console disabled
+  deletion_protection = false # matches console disabled
 
   # Your earlier settings (keep unless your assignment requires otherwise)
   backup_retention_period  = 0
@@ -509,28 +513,48 @@ resource "aws_instance" "windows_db" {
 
   iam_instance_profile = aws_iam_instance_profile.ec2_ecr_push_profile.name
 
+  lifecycle {
+    prevent_destroy = true
+  }
+
   tags = { Name = "ccs6344-mssql-db" }
 }
 
-resource "aws_iam_role" "rds_backup_restore_role" {
-  name = "rds-sqlserver-backup-restore-role"
+resource "aws_instance" "db" {
+  ami                         = "ami-024cf537d418c7c2f"
+  instance_type               = "t3.micro"
+  subnet_id                   = aws_subnet.public.id
+  vpc_security_group_ids      = [aws_security_group.db_sg.id]
+  key_name                    = var.key_name
+  associate_public_ip_address = true
 
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17",
-    Statement = [{
-      Effect    = "Allow",
-      Principal = { Service = "rds.amazonaws.com" },
-      Action    = "sts:AssumeRole"
-    }]
-  })
+  tags = { Name = "ccs6344-mssql-db" }
+
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
-variable "s3_bucket_name" {
-  type        = string
-  description = "S3 bucket for MSSQL .bak"
+resource "aws_vpc_security_group_ingress_rule" "app_http_from_alb" {
+  security_group_id            = aws_security_group.app_sg.id
+  referenced_security_group_id = aws_security_group.alb_sg.id
+  from_port                    = 80
+  to_port                      = 80
+  ip_protocol                  = "tcp"
 }
 
-variable "bak_object_key" {
-  type        = string
-  description = "Object key of the .bak file in S3 (e.g. backups/db_n_cloudSecurity_assignment_1.bak)"
+resource "aws_vpc_security_group_ingress_rule" "db_mssql_from_app" {
+  security_group_id            = aws_security_group.db_sg.id
+  referenced_security_group_id = aws_security_group.app_sg.id
+  from_port                    = 1433
+  to_port                      = 1433
+  ip_protocol                  = "tcp"
+}
+
+resource "aws_vpc_security_group_ingress_rule" "rds_mssql_from_app" {
+  security_group_id            = aws_security_group.rds_sg.id
+  referenced_security_group_id = aws_security_group.app_sg.id
+  from_port                    = 1433
+  to_port                      = 1433
+  ip_protocol                  = "tcp"
 }

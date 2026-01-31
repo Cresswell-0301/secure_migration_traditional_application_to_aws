@@ -1,6 +1,6 @@
 <?php
 
-define('DB_SERVER', getenv('DB_HOST') ?: 'ccs6344-mssql-rds.cnecgwk24aci.ap-southeast-5.rds.amazonaws.com');
+define('DB_SERVER', getenv('DB_HOST') ?: 'ccs6344-mssql-rds-public.cnecgwk24aci.ap-southeast-5.rds.amazonaws.com');
 define('DB_DATABASE', getenv('DB_NAME') ?: 'db_n_cloudSecurity_assignment_1');
 
 // Application User (use container env vars)
